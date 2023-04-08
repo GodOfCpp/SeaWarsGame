@@ -2,7 +2,7 @@ using System.Text.RegularExpressions;
 
 namespace SeaWarsGame
 {
-    public partial class Form1 : Form
+    public partial class MenuGame : Form
     {
         private const int mapSize = 10;
         private const int cellSize = 30;
@@ -10,6 +10,10 @@ namespace SeaWarsGame
 
         private int[,] myMap = new int[mapSize, mapSize];
         private int[,] enemyMap = new int[mapSize, mapSize];
+
+        private bool isPlaying;
+
+        private Chat chat;
 
 
         public void CreateMaps()
@@ -22,6 +26,8 @@ namespace SeaWarsGame
                     enemyMap[i, j] = 0;
 
                     Button myButton = new Button();
+                    myButton.Click += ConfigureShips;
+                    myButton.BackColor = Color.White;
                     Button enemyButton = new Button();
 
                     if (j == 0 || i == 0)
@@ -43,11 +49,60 @@ namespace SeaWarsGame
                     }
                     myButton.Location = new Point(j * cellSize, i * cellSize);
                     myButton.Size = new Size(cellSize, cellSize);
-                    this.Controls.Add(myButton);
+                    Invoke(() => this.Controls.Add(myButton));
 
                     enemyButton.Location = new Point(320 + j * cellSize, i * cellSize);
                     enemyButton.Size = new Size(cellSize, cellSize);
-                    this.Controls.Add(enemyButton);
+                    Invoke(() => this.Controls.Add(enemyButton));
+                }
+            }
+
+            Button startButton = new Button();
+            startButton.Text = "Начать";
+            startButton.Location = new Point(ClientSize.Width/2 - startButton.Width/2, mapSize * cellSize + 20);
+            startButton.Click += new EventHandler(Start);
+            Invoke(() => this.Controls.Add(startButton));
+        }
+
+        private bool checkShips()
+        {
+            var isBattleShip = false;
+            var isCruiser = false;
+            var isDestroyer = false;
+            var isBoat = false;
+
+            return true;
+
+        }
+
+        public void Start(object sender, EventArgs e)
+        {
+            if (checkShips())
+            {
+                isPlaying = true;
+                chat.SendMsg("ships ready");
+            }
+            else
+            {
+                MessageBox.Show("Wrong ships location");
+            }
+        }
+
+        public void ConfigureShips(object sender, EventArgs e)
+        {
+            Button pressedButton = sender as Button;
+
+            if (!isPlaying)
+            {
+                if (myMap[pressedButton.Location.Y / cellSize, pressedButton.Location.X / cellSize] == 0)
+                {
+                    pressedButton.BackColor = Color.Red;
+                    myMap[pressedButton.Location.Y / cellSize, pressedButton.Location.X / cellSize] = 1;
+                }
+                else
+                {
+                    pressedButton.BackColor = Color.White;
+                    myMap[pressedButton.Location.Y / cellSize, pressedButton.Location.X / cellSize] = 0;
                 }
             }
         }
@@ -67,20 +122,31 @@ namespace SeaWarsGame
             IpAddressBox.PlaceholderText = "Enter IP here";
             IpAddressBox.KeyPress += IpAddressBox_KeyPress;
             this.Controls.Add(IpAddressBox);
+        }
 
-            //InitGame();
+
+        private async void StartChatting(string usrname, string ip, string localPort, string remotePort)
+        {
+            Label connectionWaiting = new Label();
+            connectionWaiting.Text = "Waiting for connection...";
+            connectionWaiting.Size = new Size(200, 100);
+            connectionWaiting.Location = new Point(this.ClientSize.Width / 2 - connectionWaiting.Width / 2 + 40, this.ClientSize.Height / 2 - connectionWaiting.Height / 2);
+            if (InvokeRequired) Invoke(() => this.Controls.Add(connectionWaiting));
+
+            chat = new Chat(usrname, ip, localPort, remotePort);
+            Task.Run(chat.ReceiveMsgAsync);
+            chat.SendMsgAsync();
+            if (chat.username == "user") chat.SendMsg("ready");
+            while (chat.lastMsg != "ready") { }
+            if (chat.username == "host") chat.SendMsg("ready");
+            Invoke(() => this.Controls.Clear());
+            await Task.Run(() => CreateMaps());
+            while (chat.lastMsg != "ships ready") { }
         }
 
         private async void StartConnection(String ip)
         {
-            await Task.Run(() => FileSender.UdpFileServer.Send(ip, "GameStartAsk.txt"));
-            await Task.Run(() => FileGetter.UdpFileClient.Get());
-
-            Label connectionInfo = new Label();
-            connectionInfo.Text = "Game was accepted";
-            connectionInfo.AutoSize = true;
-
-            this.Controls.Add(connectionInfo);
+            await Task.Run(() => StartChatting("host", "127.0.0.1", "8000", "8001"));
         }
 
         private bool checkIp(String ip)
@@ -106,14 +172,9 @@ namespace SeaWarsGame
         }
         private async void connectGame_Click(object? sender, System.EventArgs? e)
         {
-            await Task.Run(() => ConnectionWait());
+           // await Task.Run(() => ConnectionWait());
             this.Controls.Clear();
-
-            Label connectionInfo = new Label();
-            connectionInfo.Text = "Successful connection";
-            connectionInfo.AutoSize = true ;
-            connectionInfo.Location = new Point(this.ClientSize.Width / 2 - connectionInfo.Width / 2 - 18, this.ClientSize.Height / 2 - connectionInfo.Height / 2);
-            this.Controls.Add(connectionInfo);
+            await Task.Run(() => StartChatting("user", "127.0.0.1", "8001", "8000"));
         }
 
 
@@ -129,10 +190,6 @@ namespace SeaWarsGame
             this.Controls.Add(startGame);
         }
 
-        private void ConnectionWait()
-        {
-             FileGetter.UdpFileClient.Get();
-        }
 
         private void ConnectButton()
         {
@@ -158,17 +215,17 @@ namespace SeaWarsGame
 
         public void InitMenu()
         {
+            isPlaying = false;
             Menu();
         }
 
 
-        public Form1()
+        public MenuGame()
         {
             InitializeComponent();
             this.Size = new Size(640, 480);
             this.Text = "Sea Wars by thienlao";
             InitMenu();
-         
     
         }
     }

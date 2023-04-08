@@ -1,6 +1,6 @@
 ﻿namespace SeaWarsGame
 {
-    partial class Form1
+    partial class MenuGame
     {
         /// <summary>
         ///  Required designer variable.
